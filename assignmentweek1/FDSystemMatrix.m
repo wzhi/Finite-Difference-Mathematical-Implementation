@@ -1,0 +1,103 @@
+function A = FDSystemMatrix(grid, kappa, rho, Dirichlet)
+%FDSystemMatrix  Matrix of finite difference coefficients.
+% A=FDSYSTEMMATRIX(GRID,KAPPA,RHO,DIRICHLET) generates the system matrix
+% corresponding to 3-point finite difference discretization of the steady
+% boundary value problem
+%            GRAD(KAPPA*GRAD(U)) + RHO*U = .. on the interior of GRID
+%                        [NX,NY]*GRAD(U) = .. on the boundary of GRID
+%                   U(DIRICHLET.Indices) = DIRICHLET.RHSValues
+%
+% or the unsteady initial value problem
+%  GRAD(KAPPA*GRAD(U)) + RHO*U - D(U)/DT = .. on the interior of GRID
+%                        [NX,NY]*GRAD(U) = .. on the boundary of GRID
+%                   U(DIRICHLET.Indices) = DIRICHLET.RHSValues
+%
+% See also FDDIRICHLET, FDGRID, FDSYSTEMVECTOR.
+
+% Preconditions
+narginchk(4, 4)
+
+[ny, nx] = size(grid.Indices);
+n = numel(grid.Indices);
+
+% Pre-allocate global matrix
+A = spalloc(n, n, 5*n);
+
+% Constently treat kappa as a 2x2 matrix
+kappa = kappa*eye(2);
+
+% Interior grid points
+for i = 2 : ny - 1
+    for j = 2 : nx - 1
+        %format inputs ready to find
+        x=[grid.X(i,j-1),grid.X(i,j),grid.X(i,j+1)];
+        y=[grid.Y(i-1,j),grid.Y(i,j),grid.Y(i+1,j)];
+        cx1 = FDMolecule1D(1,x(2),x);
+        cx2 = FDMolecule1D(2,x(2),x);
+        cy1 = FDMolecule1D(1,y(2),y);
+        cy2 = FDMolecule1D(2,y(2),y);
+        %let us construct the matrices:
+        d2udy2=zeros(3);
+        d2udy2(:,2)=cy2;
+        d2udx2=zeros(3);
+        d2udx2(2,:)=cx2';
+        d2udxdy=cy1*cx1';
+        %create the molecule
+        molecule=kappa(1,1).*d2udx2+kappa(1,2).*d2udxdy+kappa(2,1).*d2udxdy+kappa(2,2).*d2udy2;
+        %Create A across
+        %copy over the content of the molecule to the matrix
+        %first row:
+        A(grid.Indices(i,j), grid.Indices(i-1,j-1))=molecule(1,1);
+        A(grid.Indices(i,j), grid.Indices(i-1,j))=molecule(1,2);
+        A(grid.Indices(i,j), grid.Indices(i-1,j+1))=molecule(1,3);
+        %2nd row:
+        A(grid.Indices(i,j), grid.Indices(i,j-1))=molecule(2,1);
+        A(grid.Indices(i,j), grid.Indices(i,j))=molecule(2,2);
+        A(grid.Indices(i,j), grid.Indices(i,j+1))=molecule(2,3);
+        %3rd row:
+        A(grid.Indices(i,j), grid.Indices(i+1,j-1))=molecule(3,1);
+        A(grid.Indices(i,j), grid.Indices(i+1,j))=molecule(3,2);
+        A(grid.Indices(i,j), grid.Indices(i+1,j+1))=molecule(3,3);
+        %consider rho
+        A(grid.Indices(i,j), grid.Indices(i,j))=A(grid.Indices(i,j), grid.Indices(i,j))+rho;
+    end
+end
+
+% Include corner points on vertical boundaries
+for i = 1 : ny
+    xLeft=[grid.X(i,1),grid.X(i,2),grid.X(i,3)];
+    xRight=[grid.X(i,nx-2),grid.X(i,nx-1),grid.X(i,nx)];
+    
+    cx1Left = FDMolecule1D(1,xLeft(1),xLeft);
+    cx1Right = FDMolecule1D(1,xRight(3),xRight);
+    
+    
+    A(grid.Indices(i,1), grid.Indices(i,1))=-1.*cx1Left(1);
+    A(grid.Indices(i,1), grid.Indices(i,2))=-1.*cx1Left(2);
+    A(grid.Indices(i,1), grid.Indices(i,3))=-1.*cx1Left(3);
+    A(grid.Indices(i,nx), grid.Indices(i,nx-2))=cx1Right(1);
+    A(grid.Indices(i,nx), grid.Indices(i,nx-1))=cx1Right(2);
+    A(grid.Indices(i,nx), grid.Indices(i,nx))=cx1Right(3);
+    
+end
+
+% Step 4: Skip corner points on horizontal boundaries, say
+for j = 2 : nx - 1
+    yUp=[grid.Y(1,j),grid.Y(2,j),grid.Y(3,j)];
+    yDown=[grid.Y(ny,j),grid.Y(ny-1,j),grid.Y(ny-2,j)];
+    cy1Up = FDMolecule1D(1,yUp(1),yUp);
+    cy1Down = FDMolecule1D(1,yDown(1),yDown);
+    A(grid.Indices(1,j), grid.Indices(1,j))=-1.*cy1Up(1);
+    A(grid.Indices(1,j), grid.Indices(2,j))=-1.*cy1Up(2);
+    A(grid.Indices(1,j), grid.Indices(3,j))=-1.*cy1Up(3);
+    A(grid.Indices(ny,j), grid.Indices(ny,j))=cy1Down(1);
+    A(grid.Indices(ny,j), grid.Indices(ny-1,j))=cy1Down(2);
+    A(grid.Indices(ny,j), grid.Indices(ny-2,j))=cy1Down(3);
+end
+
+% Rows for Dirichlet points
+for i=1:numel(Dirichlet.Indices)
+    A(Dirichlet.Indices(i),:)=zeros(1,n);
+    A(Dirichlet.Indices(i), Dirichlet.Indices(i))=1;
+end
+

@@ -1,0 +1,183 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>The theta method</title><meta name="generator" content="MATLAB 8.5"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2016-08-06"><meta name="DC.source" content="FDSolveLinearODEsDemo.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h1>The theta method</h1><!--introduction--><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#2">Time-stepping for a generic linear system of ODEs</a></li></ul></div><pre class="codeinput">clear
+FDLabFolders
+</pre><h2>Time-stepping for a generic linear system of ODEs<a name="2"></a></h2><p><b>Task</b>: Implement the <img src="FDSolveLinearODEsDemo_eq08288499342375314727.png" alt="$\theta$">-scheme for a generic linear system of ODEs.</p><pre class="codeinput">dbtype <span class="string">FDSolveLinearODEs</span>
+</pre><pre class="codeoutput">
+1     function Y = FDSolveLinearODEs(M, A, f, t, y0, theta, Solver)
+2     %FDSOLVELINEARODES  Solve linear system of ODEs.
+3     % YY=FDSOLVELINEARODES(M,A,F,T,Y0,THETA) returns a numerical
+4     % solution to the initial value problem
+5     %    M*Y'(t) = A*Y(t) + F(t)
+6     %      Y(T(1)) = Y0
+7     %        T(1) &lt;= t &lt;= T(end),
+8     % where
+9     %    M is a constant mass matrix, or [] if no mass matrix is required
+10    %    A is a constant stiffness matrix
+11    %    F is a given function of time
+12    %    Y0 is a given vector containing the initial state
+13    %    [T(1), T(end)] is the time interval of interest
+14    %    YY(k,:) is our numerical approximation of Y(T(k)).
+15    %
+16    % FDSOLVELINEARODES(...,SOLVER) employs a custom algorithm for
+17    % solving the system of linear equations that results at each time step.
+18    %    SOLVER(AA,BB,X0) should compute X such that AA*X=BB
+19    %       where AA is an arbitrary matrix,
+20    %             BB is an arbitrary vector,
+21    %         and X0 is an "initial guess" of X.
+22    %
+23    % Time step sizes are given by DIFF(T)
+24    %  i.e. the size of the K'th step is T(K+1)-T(K).
+25    %
+26    % THETA dictates the time-stepping scheme:
+27    %    THETA   Method           Order of Accuracy
+28    %      0.0   Explicit Euler   1st order
+29    %      1/2   Crank-Nicolson   2nd order
+30    %      2/3   Galerkin Method  1st order
+31    %      1.0   Implicit Euler   1st order
+32    %
+33    % See also ODE45, ODE15S.
+34    
+35    narginchk(6, 7)
+36    
+37    if nargin &lt; 7 || isempty(Solver)
+38        % Default solver for linear algebraic equations 
+39        Solver = @(AA, bb, x0) AA\bb;
+40    end
+41    
+42    Y = FDSolveLinearODEsImplementation(M, A, f, t, y0, theta, Solver);
+</pre><p>Configure a small test problem whose solution exhibits mild growth</p><pre class="codeinput">clear
+M = [1 1 0; 0 1 0; 0 0 1]; <span class="comment">% non-singular mass matrix</span>
+A = -[1 1 1; 0 1 2; 0 -2 1]; <span class="comment">% RHS system matrix</span>
+n = length(A); <span class="comment">% system dimension</span>
+y0 = (1 : n)'; <span class="comment">% initial states</span>
+numSteps = 20; <span class="comment">% number of time steps</span>
+tGrid = linspace(0, 3, numSteps + 1)'; <span class="comment">% grid of time points</span>
+[exactSolution, ODESource] = DataLinearODE(M, A, tGrid(1), y0);
+</pre><p>Solution with our new code</p><pre class="codeinput">theta = 2/3;
+u = FDSolveLinearODEs(M, A, ODESource, tGrid, y0, theta); <span class="comment">% solve IVP</span>
+</pre><p>Reference solution with <tt>ode45</tt></p><pre class="codeinput">options = odeset(<span class="string">'Mass'</span>, M);
+[~, uref] = ode45(@(t, u) A*u + ODESource(t), tGrid, y0, options);
+</pre><p>Visual comparison of solutions</p><pre class="codeinput">clf
+set(gca, <span class="string">'FontSize'</span>, FontSize)
+plot( <span class="keyword">...</span>
+    tGrid, u, <span class="string">'o'</span>, <span class="keyword">...</span>
+    tGrid, uref, <span class="string">'.'</span>, <span class="keyword">...</span>
+    tGrid, FDEvaluateRows(exactSolution, tGrid), <span class="string">'-'</span>, <span class="keyword">...</span>
+    <span class="string">'MarkerSize'</span>, 15)
+xlabel(<span class="string">'t'</span>)
+ylabel(<span class="string">'u(t)'</span>)
+</pre><img vspace="5" hspace="5" src="FDSolveLinearODEsDemo_01.png" alt=""> <pre class="codeinput">assert(norm(Compare(u, uref), inf) &lt; 1e-12, <span class="string">'Mismatch exceeds 1%'</span>)
+</pre><p class="footer"><br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2015a</a><br></p></div><!--
+##### SOURCE BEGIN #####
+%% The theta method
+
+%%
+clear
+FDLabFolders
+
+%% Time-stepping for a generic linear system of ODEs
+% *Task*: Implement the $\theta$-scheme for a generic linear system of ODEs.
+dbtype FDSolveLinearODEs
+
+%%
+% Configure a small test problem whose solution exhibits mild growth
+clear
+M = [1 1 0; 0 1 0; 0 0 1]; % non-singular mass matrix
+A = -[1 1 1; 0 1 2; 0 -2 1]; % RHS system matrix 
+n = length(A); % system dimension
+y0 = (1 : n)'; % initial states
+numSteps = 20; % number of time steps
+tGrid = linspace(0, 3, numSteps + 1)'; % grid of time points
+[exactSolution, ODESource] = DataLinearODE(M, A, tGrid(1), y0);
+
+%%
+% Solution with our new code
+theta = 2/3; 
+u = FDSolveLinearODEs(M, A, ODESource, tGrid, y0, theta); % solve IVP
+%%
+% Reference solution with |ode45|
+options = odeset('Mass', M);
+[~, uref] = ode45(@(t, u) A*u + ODESource(t), tGrid, y0, options); 
+%%
+% Visual comparison of solutions
+clf
+set(gca, 'FontSize', FontSize)
+plot( ...
+    tGrid, u, 'o', ...
+    tGrid, uref, '.', ...
+    tGrid, FDEvaluateRows(exactSolution, tGrid), '-', ...
+    'MarkerSize', 15)
+xlabel('t')
+ylabel('u(t)')
+%%
+assert(norm(Compare(u, uref), inf) < 1e-12, 'Mismatch exceeds 1%')
+
+##### SOURCE END #####
+--></body></html>

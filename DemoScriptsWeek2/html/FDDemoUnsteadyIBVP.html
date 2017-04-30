@@ -1,0 +1,203 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>Implicit solution of an unsteady reaction-diffusion problem</title><meta name="generator" content="MATLAB 8.5"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2016-08-06"><meta name="DC.source" content="FDDemoUnsteadyIBVP.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h1>Implicit solution of an unsteady reaction-diffusion problem</h1><!--introduction--><!--/introduction--><pre class="codeinput">clear
+FDLabFolders
+</pre><p>PDE coefficients: The manufactured solution is polynomial in space, but non-polynomial in time.</p><pre class="codeinput">rho = 1; <span class="comment">% reaction coefficient</span>
+kappa = 5; <span class="comment">% diffusion coefficient</span>
+[exactSolution, domainSource, NeumannSource] = <span class="keyword">...</span>
+    DataUnsteadyPoly(kappa, rho); <span class="comment">% source terms</span>
+</pre><p>Spatial grid</p><pre class="codeinput">x = lglspace(0, 3, 21);
+y = lglspace(0, 2, 25);
+xyGrid = FDGrid(x, y); <span class="comment">% xyGrid point coordinates</span>
+Dirichlet = FDDirichletUnsteady( <span class="keyword">...</span>
+    xyGrid, exactSolution, xyGrid.Indices(1, :)); <span class="comment">% south boundary, say</span>
+</pre><p>Temporal grid</p><pre class="codeinput">timeSpan = [1, 12]; <span class="comment">% time interval</span>
+numSteps = 800; <span class="comment">% number of time steps</span>
+tGrid = linspace(timeSpan(1), timeSpan(end), numSteps + 1)';
+</pre><p>Initial state</p><pre class="codeinput">uInitial = exactSolution(timeSpan(1), xyGrid.X, xyGrid.Y);
+</pre><p>Mass matrix and stiffness matrix</p><pre class="codeinput">M = FDMassMatrix(xyGrid, Dirichlet);
+A = FDSystemMatrix(xyGrid, kappa, rho, Dirichlet);
+</pre><p>Modify interface for use with generic time-stepping routines</p><pre class="codeinput">f = @(t) -FDSystemVectorUnsteady( <span class="keyword">...</span>
+    t, xyGrid, domainSource, NeumannSource, Dirichlet);
+</pre><p>Solution with our new code</p><pre class="codeinput">theta = 0.5;
+U = FDSolveLinearODEs(M, A, f, tGrid, uInitial, theta); <span class="comment">% solve IVP</span>
+</pre><p>Reference solution with production code <tt>ode15s</tt>. This code is <b>not</b> part of the lab, but may be of interest :-)</p><pre class="codeinput">RHS = @(t, u) A*u + f(t);
+options = odeset( <span class="keyword">...</span>
+    <span class="string">'RelTol'</span>, 1e-3, <span class="keyword">...</span>
+    <span class="string">'AbsTol'</span>, 1e-3, <span class="keyword">...</span>
+    <span class="string">'InitialStep'</span>, tGrid(2) - tGrid(1), <span class="keyword">...</span>
+    <span class="string">'Jacobian'</span>, A, <span class="keyword">...</span>
+    <span class="string">'Mass'</span>, M, <span class="keyword">...</span>
+    <span class="string">'MassSingular'</span>, <span class="string">'yes'</span>, <span class="keyword">...</span>
+    <span class="string">'Stats'</span>, <span class="string">'on'</span>);
+[~,UU] = ode15s(RHS, tGrid, uInitial, options);
+</pre><pre class="codeoutput">41 successful steps
+3 failed attempts
+88 function evaluations
+0 partial derivatives
+12 LU decompositions
+87 solutions of linear systems
+</pre><p>Time history of relative errors</p><pre class="codeinput">max2 = @(a) max(a, [], 2); <span class="comment">% maximum in each row</span>
+set(gca, <span class="string">'FontSize'</span>, FontSize)
+semilogy( <span class="keyword">...</span>
+    tGrid, max2(Compare(FDEvaluate(exactSolution, xyGrid, tGrid), U)), <span class="string">'.'</span>, <span class="keyword">...</span>
+    tGrid, max2(Compare(FDEvaluate(exactSolution, xyGrid, tGrid), UU)), <span class="string">'.'</span>)
+set(legend( <span class="keyword">...</span>
+    <span class="string">'SolveLinearODEs (fixed steps)'</span>, <span class="keyword">...</span>
+    <span class="string">'ode15s (adaptive steps)'</span>, <span class="keyword">...</span>
+    <span class="string">'Location'</span>, <span class="string">'SouthEast'</span>), <span class="string">'Box'</span>, <span class="string">'off'</span>)
+set(gca, <span class="string">'FontSize'</span>, 15)
+xlabel(<span class="string">'t'</span>)
+ylabel(<span class="string">'error'</span>)
+</pre><img vspace="5" hspace="5" src="FDDemoUnsteadyIBVP_01.png" alt=""> <p>Ensure that relative errors are reasonably small and comparable with those of <tt>ode15s</tt>.</p><pre class="codeinput">assert(max(max2(Compare(FDEvaluate(exactSolution, xyGrid, tGrid), U))) &lt; 1e-2)
+</pre><p class="footer"><br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2015a</a><br></p></div><!--
+##### SOURCE BEGIN #####
+%% Implicit solution of an unsteady reaction-diffusion problem
+
+%%
+clear
+FDLabFolders
+
+%% 
+% PDE coefficients: The manufactured solution is polynomial in space, but
+% non-polynomial in time.  
+rho = 1; % reaction coefficient
+kappa = 5; % diffusion coefficient
+[exactSolution, domainSource, NeumannSource] = ...
+    DataUnsteadyPoly(kappa, rho); % source terms
+
+%% 
+% Spatial grid
+x = lglspace(0, 3, 21);
+y = lglspace(0, 2, 25);
+xyGrid = FDGrid(x, y); % xyGrid point coordinates
+Dirichlet = FDDirichletUnsteady( ... 
+    xyGrid, exactSolution, xyGrid.Indices(1, :)); % south boundary, say
+
+%% 
+% Temporal grid
+timeSpan = [1, 12]; % time interval
+numSteps = 800; % number of time steps
+tGrid = linspace(timeSpan(1), timeSpan(end), numSteps + 1)'; 
+
+%% 
+% Initial state
+uInitial = exactSolution(timeSpan(1), xyGrid.X, xyGrid.Y); 
+
+%% 
+% Mass matrix and stiffness matrix
+M = FDMassMatrix(xyGrid, Dirichlet);
+A = FDSystemMatrix(xyGrid, kappa, rho, Dirichlet);
+
+%% 
+% Modify interface for use with generic time-stepping routines
+f = @(t) -FDSystemVectorUnsteady( ...
+    t, xyGrid, domainSource, NeumannSource, Dirichlet);
+
+%% 
+% Solution with our new code
+theta = 0.5; 
+U = FDSolveLinearODEs(M, A, f, tGrid, uInitial, theta); % solve IVP
+
+%%
+% Reference solution with production code |ode15s|. This code is
+% *not* part of the lab, but may be of interest :-)
+RHS = @(t, u) A*u + f(t);
+options = odeset( ...
+    'RelTol', 1e-3, ...
+    'AbsTol', 1e-3, ...
+    'InitialStep', tGrid(2) - tGrid(1), ...
+    'Jacobian', A, ...
+    'Mass', M, ...
+    'MassSingular', 'yes', ...
+    'Stats', 'on');
+[~,UU] = ode15s(RHS, tGrid, uInitial, options);
+
+%%
+% Time history of relative errors
+max2 = @(a) max(a, [], 2); % maximum in each row
+set(gca, 'FontSize', FontSize)
+semilogy( ...
+    tGrid, max2(Compare(FDEvaluate(exactSolution, xyGrid, tGrid), U)), '.', ...
+    tGrid, max2(Compare(FDEvaluate(exactSolution, xyGrid, tGrid), UU)), '.')
+set(legend( ...
+    'SolveLinearODEs (fixed steps)', ...
+    'ode15s (adaptive steps)', ...
+    'Location', 'SouthEast'), 'Box', 'off')
+set(gca, 'FontSize', 15)
+xlabel('t')
+ylabel('error')
+
+%%
+% Ensure that relative errors are reasonably small and comparable with
+% those of |ode15s|.
+assert(max(max2(Compare(FDEvaluate(exactSolution, xyGrid, tGrid), U))) < 1e-2)
+
+##### SOURCE END #####
+--></body></html>
